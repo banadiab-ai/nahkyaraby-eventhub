@@ -1,0 +1,177 @@
+// Update event
+app.put("/make-server-08658f87/events/:id", async (c) => {
+  try {
+    const authHeader = c.req.header('Authorization');
+    const { error: authError, user } = await verifyAuth(authHeader);
+    
+    if (authError || !user) {
+      return c.json({ error: authError || 'Unauthorized' }, 401);
+    }
+
+    // Check if user is admin
+    const userData = await kv.get(`user:${user.id}`);
+    if (!userData || userData.role !== 'admin') {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+
+    const eventId = c.req.param('id');
+    const eventData = await c.req.json();
+
+    // Get existing event
+    const existingEvent = await kv.get(`event:${eventId}`);
+    if (!existingEvent) {
+      return c.json({ error: 'Event not found' }, 404);
+    }
+
+    // Update event while preserving signedUpStaff and createdAt
+    const updatedEvent = {
+      ...existingEvent,
+      ...eventData,
+      id: eventId,
+      signedUpStaff: existingEvent.signedUpStaff,
+      createdAt: existingEvent.createdAt
+    };
+
+    await kv.set(`event:${eventId}`, updatedEvent);
+
+    // Send notifications based on event status (wrapped in try-catch to not fail the update)
+    try {
+      const eventStatus = updatedEvent.status || 'open';
+    
+      if (eventStatus !== 'draft') {
+        console.log(`📢 Event updated with status "${eventStatus}", checking for changes to notify staff...`);
+        
+        // Detect changes between existing and updated event
+        const changes: string[] = [];
+        
+        if (existingEvent.name !== updatedEvent.name) {
+          changes.push(`Name: "${existingEvent.name}" → "${updatedEvent.name}"`);
+        }
+        if (existingEvent.date !== updatedEvent.date) {
+          const oldDate = new Date(existingEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          const newDate = new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          changes.push(`Date: ${oldDate} → ${newDate}`);
+        }
+        if (existingEvent.time !== updatedEvent.time) {
+          changes.push(`Time: ${existingEvent.time} → "${updatedEvent.time}"`);
+        }
+        if (existingEvent.location !== updatedEvent.location) {
+          changes.push(`Location: "${existingEvent.location}" → "${updatedEvent.location}"`);
+        }
+        if (existingEvent.duration !== updatedEvent.duration) {
+          changes.push(`Duration: ${existingEvent.duration} → ${updatedEvent.duration}`);
+        }
+        if (existingEvent.points !== updatedEvent.points) {
+          changes.push(`Points: ${existingEvent.points} → ${updatedEvent.points}`);
+        }
+        if (existingEvent.requiredLevel !== updatedEvent.requiredLevel) {
+          changes.push(`Required Level: ${existingEvent.requiredLevel} → ${updatedEvent.requiredLevel}`);
+        }
+        if (existingEvent.description !== updatedEvent.description) {
+          changes.push(`Description updated`);
+        }
+        if (existingEvent.notes !== updatedEvent.notes) {
+          changes.push(`Notes updated`);
+        }
+        
+        if (changes.length > 0) {
+          console.log(`✏️ Detected ${changes.length} change(s):`, changes);
+          
+          // Determine which staff to notify based on status
+          let staffToNotify: string[] = [];
+          
+          if (eventStatus === 'open') {
+            // Notify staff who are participating (signed up)
+            staffToNotify = updatedEvent.signedUpStaff || [];
+            console.log(`📋 Event is OPEN - notifying ${staffToNotify.length} participating staff`);
+          } else if (eventStatus === 'closed') {
+            // Notify staff who are selected (confirmed)
+            staffToNotify = updatedEvent.confirmedStaff || [];
+            console.log(`🔒 Event is CLOSED - notifying ${staffToNotify.length} selected staff`);
+          }
+          
+          if (staffToNotify.length > 0) {
+            // Check if Telegram is connected
+            const telegramSettings = await kv.get('telegram:settings');
+            
+            if (telegramSettings && telegramSettings.connected) {
+              console.log(`✈️ Telegram connected, sending update notifications to ${staffToNotify.length} staff members`);
+              
+              let notificationsSent = 0;
+              
+              for (let i = 0; i < staffToNotify.length; i++) {
+                const staffId = staffToNotify[i];
+                const staff = await kv.get(`user:${staffId}`);
+                
+                if (!staff) {
+                  console.log(`  ⚠️ Staff member ${staffId} not found, skipping`);
+                  continue;
+                }
+                
+                const chatId = staff.telegramChatId || staff.telegramUsername;
+                if (!chatId || chatId.trim() === '') {
+                  console.log(`  ⚠️ ${staff.name}: No Telegram chat ID, skipping`);
+                  continue;
+                }
+                
+                // Format the changes list
+                const changesText = changes.map((change, idx) => `${idx + 1}. ${change}`).join('\n');
+                
+                const telegramMessage = `📝 *Event Updated*
+
+Hello ${staff.name},
+
+An event you're ${eventStatus === 'open' ? 'signed up for' : 'selected for'} has been updated:
+
+*${updatedEvent.name}*
+
+*Changes Made:*
+${changesText}
+
+*Current Event Details:*
+📍 Location: ${updatedEvent.location}
+📆 Date: ${new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Time: ${updatedEvent.time}
+⏱️ Duration: ${updatedEvent.duration}
+⭐ Points: ${updatedEvent.points}
+
+Please make note of these changes. Log in to the app for full details.`;
+
+                const telegramResult = await sendTelegramMessage(chatId, telegramMessage);
+                
+                if (telegramResult.success) {
+                  console.log(`  ✓ Update notification sent to ${staff.name}`);
+                  notificationsSent++;
+                } else {
+                  console.log(`  ✗ Failed to send update notification to ${staff.name}: ${telegramResult.error}`);
+                }
+                
+                // Rate limiting
+                if (i < staffToNotify.length - 1) {
+                  await delay(600);
+                }
+              }
+              
+              console.log(`✅ Sent ${notificationsSent} update notification(s)`);
+            } else {
+              console.log(`✈️ Telegram not connected, skipping update notifications`);
+            }
+          } else {
+            console.log(`ℹ️ No staff to notify (event status: ${eventStatus})`);
+          }
+        } else {
+          console.log(`ℹ️ No significant changes detected, skipping notifications`);
+        }
+      } else {
+        console.log(`ℹ️ Event status is "draft", skipping update notifications`);
+      }
+    } catch (notificationError) {
+      console.error('Error sending event update notifications:', notificationError);
+    }
+
+    return c.json({ success: true, event: updatedEvent });
+  } catch (error) {
+    console.error('Error updating event:', error);
+    return c.json({ error: 'Failed to update event' }, 500);
+  }
+});

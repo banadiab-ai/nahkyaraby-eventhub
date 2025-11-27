@@ -1,0 +1,286 @@
+// This file contains the new notification logic to replace lines 1275-1660 in /supabase/functions/server/index.tsx
+
+    // Send notifications based on status transitions
+    try {
+      const eventStatus = updatedEvent.status || 'open';
+      const oldStatus = existingEvent.status || 'open';
+      
+      console.log(`🔍 Notification check - Old status: "${oldStatus}", New status: "${eventStatus}"`);
+      
+      // RULE 1: New event (Draft → Open) - Send to eligible staff
+      if (oldStatus === 'draft' && eventStatus === 'open') {
+        console.log(`📢 Publishing event (Draft → Open) - sending "new event" notifications to eligible staff...`);
+        
+        // Get all staff members from Supabase Auth
+        const supabase = getSupabaseAdmin();
+        const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
+        
+        const staffMembers = authUsers
+          .filter(u => u.user_metadata?.role === 'staff' && u.user_metadata?.status === 'active')
+          .map(u => ({
+            id: u.id,
+            email: u.email,
+            name: u.user_metadata?.name || u.email,
+            level: u.user_metadata?.level || '',
+            telegramChatId: u.user_metadata?.telegramChatId || '',
+            telegramUsername: u.user_metadata?.telegramUsername || ''
+          }));
+        
+        // Fetch levels from Postgres
+        const { data: levels } = await supabase
+          .from('levels')
+          .select('*')
+          .order('order_index', { ascending: true });
+        
+        const sortedLevels = levels || [];
+        const eventLevel = sortedLevels.find(l => l.name === updatedEvent.requiredLevel);
+        
+        if (eventLevel && staffMembers.length > 0) {
+          // Filter staff who can access this event
+          const eligibleStaff = staffMembers.filter(staff => {
+            if (!staff.level) return false;
+            const staffLevel = sortedLevels.find(l => l.name === staff.level);
+            return staffLevel && staffLevel.order_index >= eventLevel.order_index;
+          });
+          
+          console.log(`📋 ${eligibleStaff.length} eligible staff members for this event`);
+          
+          // Send Telegram notifications
+          const telegramSettings = await getIntegrationSettings('telegram');
+          
+          if (telegramSettings && telegramSettings.connected) {
+            console.log(`✈️ Sending new event notifications to ${eligibleStaff.length} staff members`);
+            
+            let sentCount = 0;
+            for (let i = 0; i < eligibleStaff.length; i++) {
+              const staff = eligibleStaff[i];
+              const chatId = staff.telegramChatId || staff.telegramUsername;
+              
+              if (!chatId || chatId.trim() === '') {
+                console.log(`  ⚠️ ${staff.name}: No Telegram chat ID, skipping`);
+                continue;
+              }
+              
+              const telegramMessage = `🎉 *New Event Available!*
+
+Hello ${staff.name},
+
+A new event has been posted that you're eligible to attend:
+
+📅 *${updatedEvent.name}*
+📍 Location: ${updatedEvent.location}
+📆 Date: ${new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Time: ${updatedEvent.time}
+🎯 Required Level: ${updatedEvent.requiredLevel}
+⭐ Points: ${updatedEvent.points} points${updatedEvent.description ? `
+
+📝 Description: ${updatedEvent.description}` : ''}${updatedEvent.notes ? `
+
+💬 Notes: ${updatedEvent.notes}` : ''}
+
+Log in to Nahky Araby Event Hub to sign up for this event and start earning points!`;
+              
+              const result = await sendTelegramMessage(chatId, telegramMessage);
+              if (result.success) {
+                console.log(`  ✓ Sent to ${staff.name}`);
+                sentCount++;
+              } else {
+                console.log(`  ✗ Failed to send to ${staff.name}: ${result.error}`);
+              }
+              
+              if (i < eligibleStaff.length - 1) await delay(600);
+            }
+            
+            console.log(`✅ Sent ${sentCount} new event notifications`);
+          } else {
+            console.log(`✈️ Telegram not connected, skipping new event notifications`);
+          }
+        }
+      }
+      // RULE 7: Open → Cancelled - Send to all signed up staff
+      else if (oldStatus === 'open' && eventStatus === 'cancelled') {
+        console.log(`📢 Cancelling open event (Open → Cancelled) - notifying all signed up staff...`);
+        
+        const staffToNotify = updatedEvent.signedUpStaff || [];
+        
+        if (staffToNotify.length > 0) {
+          const telegramSettings = await getIntegrationSettings('telegram');
+          
+          if (telegramSettings && telegramSettings.connected) {
+            console.log(`✈️ Sending cancellation notifications to ${staffToNotify.length} signed up staff`);
+            
+            const supabase = getSupabaseAdmin();
+            const { data: { users: authUsers } } = await supabase.auth.admin.listUsers();
+            
+            const participatingStaff = authUsers
+              .filter(u => staffToNotify.includes(u.id) && u.user_metadata?.status === 'active')
+              .map(u => ({
+                id: u.id,
+                name: u.user_metadata?.name || u.email,
+                telegramChatId: u.user_metadata?.telegramChatId || '',
+                telegramUsername: u.user_metadata?.telegramUsername || ''
+              }));
+            
+            let sentCount = 0;
+            for (let i = 0; i < participatingStaff.length; i++) {
+              const staff = participatingStaff[i];
+              const chatId = staff.telegramChatId || staff.telegramUsername;
+              
+              if (!chatId || chatId.trim() === '') {
+                console.log(`  ⚠️ ${staff.name}: No Telegram chat ID, skipping`);
+                continue;
+              }
+              
+              const telegramMessage = `❌ *Event Cancelled*
+
+Hello ${staff.name},
+
+The following event has been cancelled:
+
+📅 *${updatedEvent.name}*
+📍 Location: ${updatedEvent.location}
+📆 Date: ${new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Time: ${updatedEvent.time}
+
+We apologize for any inconvenience. Please check the app for other available events.`;
+              
+              const result = await sendTelegramMessage(chatId, telegramMessage);
+              if (result.success) {
+                console.log(`  ✓ Sent cancellation to ${staff.name}`);
+                sentCount++;
+              } else {
+                console.log(`  ✗ Failed to send to ${staff.name}: ${result.error}`);
+              }
+              
+              if (i < participatingStaff.length - 1) await delay(600);
+            }
+            
+            console.log(`✅ Sent ${sentCount} cancellation notifications`);
+          } else {
+            console.log(`✈️ Telegram not connected, skipping cancellation notifications`);
+          }
+        } else {
+          console.log(`ℹ️ No staff signed up, no notifications to send`);
+        }
+      }
+      // RULE 10: Closed → Cancelled - Send to selected staff only (handled by cancel endpoint, not update)
+      // This will be handled by the cancel endpoint which already has the correct logic
+      
+      // Handle detail changes (when status stays the same and event is not draft)
+      else if (eventStatus !== 'draft') {
+        const changes: string[] = [];
+        
+        if (existingEvent.name !== updatedEvent.name) {
+          changes.push(`Name: "${existingEvent.name}" → "${updatedEvent.name}"`);
+        }
+        if (existingEvent.date !== updatedEvent.date) {
+          const oldDate = new Date(existingEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          const newDate = new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          changes.push(`Date: ${oldDate} → ${newDate}`);
+        }
+        if (existingEvent.time !== updatedEvent.time) {
+          changes.push(`Time: ${existingEvent.time} → ${updatedEvent.time}`);
+        }
+        if (existingEvent.location !== updatedEvent.location) {
+          changes.push(`Location: "${existingEvent.location}" → "${updatedEvent.location}"`);
+        }
+        if (existingEvent.points !== updatedEvent.points) {
+          changes.push(`Points: ${existingEvent.points} → ${updatedEvent.points}`);
+        }
+        if (existingEvent.requiredLevel !== updatedEvent.requiredLevel) {
+          changes.push(`Required Level: ${existingEvent.requiredLevel} → ${updatedEvent.requiredLevel}`);
+        }
+        if (existingEvent.description !== updatedEvent.description) {
+          changes.push(`Description updated`);
+        }
+        if (existingEvent.notes !== updatedEvent.notes) {
+          changes.push(`Notes updated`);
+        }
+        
+        if (changes.length > 0 && oldStatus === eventStatus) {
+          console.log(`✏️ Detected ${changes.length} detail change(s), sending update notifications...`);
+          
+          let staffToNotify: string[] = [];
+          
+          if (eventStatus === 'open') {
+            staffToNotify = updatedEvent.signedUpStaff || [];
+            console.log(`📋 Event is OPEN - notifying ${staffToNotify.length} signed up staff`);
+          } else if (eventStatus === 'closed') {
+            staffToNotify = updatedEvent.confirmedStaff || [];
+            console.log(`🔒 Event is CLOSED - notifying ${staffToNotify.length} selected staff`);
+          }
+          
+          if (staffToNotify.length > 0) {
+            const telegramSettings = await getIntegrationSettings('telegram');
+            
+            if (telegramSettings && telegramSettings.connected) {
+              console.log(`✈️ Sending update notifications to ${staffToNotify.length} staff members`);
+              
+              const supabase = getSupabaseAdmin();
+              let sentCount = 0;
+              
+              for (let i = 0; i < staffToNotify.length; i++) {
+                const staffId = staffToNotify[i];
+                const { error: staffError, staff } = await getStaffFromAuth(staffId);
+                
+                if (staffError || !staff || staff.status !== 'active') {
+                  console.log(`  ⚠️ Staff ${staffId}: Not found or inactive, skipping`);
+                  continue;
+                }
+                
+                const chatId = staff.telegramChatId || staff.telegramUsername;
+                if (!chatId || chatId.trim() === '') {
+                  console.log(`  ⚠️ ${staff.name}: No Telegram chat ID, skipping`);
+                  continue;
+                }
+                
+                const changesText = changes.map((change, idx) => `${idx + 1}. ${change}`).join('\\n');
+                
+                const telegramMessage = `📝 *Event Updated*
+
+Hello ${staff.name},
+
+An event you're ${eventStatus === 'open' ? 'signed up for' : 'selected for'} has been updated:
+
+*${updatedEvent.name}*
+
+*Changes Made:*
+${changesText}
+
+*Current Event Details:*
+📍 Location: ${updatedEvent.location}
+📆 Date: ${new Date(updatedEvent.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+🕐 Time: ${updatedEvent.time}
+⭐ Points: ${updatedEvent.points}
+
+Please make note of these changes. Log in to the app for full details.`;
+                
+                const result = await sendTelegramMessage(chatId, telegramMessage);
+                if (result.success) {
+                  console.log(`  ✓ Sent update to ${staff.name}`);
+                  sentCount++;
+                } else {
+                  console.log(`  ✗ Failed to send to ${staff.name}: ${result.error}`);
+                }
+                
+                if (i < staffToNotify.length - 1) await delay(600);
+              }
+              
+              console.log(`✅ Sent ${sentCount} update notifications`);
+            } else {
+              console.log(`✈️ Telegram not connected, skipping update notifications`);
+            }
+          } else {
+            console.log(`ℹ️ No staff to notify (event status: ${eventStatus})`);
+          }
+        } else if (changes.length > 0) {
+          console.log(`ℹ️ Detail changes detected but status also changed, skipping detail update notifications`);
+        } else {
+          console.log(`ℹ️ No detail changes detected`);
+        }
+      } else {
+        console.log(`ℹ️ Event status is "draft", skipping notifications`);
+      }
+    } catch (notificationError) {
+      console.error('Error sending notifications:', notificationError);
+    }

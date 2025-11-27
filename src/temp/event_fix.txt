@@ -1,0 +1,14 @@
+Lines 700-707 need to be deleted:
+    // Store time and duration in description since time column may not exist
+    let enhancedDescription = eventData.description || '';
+    if (eventData.time || eventData.duration) {
+      const timeStr = eventData.time ? `Time: ${eventData.time}` : '';
+      const durationStr = eventData.duration ? `Duration: ${eventData.duration}` : '';
+      const combinedInfo = [timeStr, durationStr].filter(Boolean).join(' | ');
+      enhancedDescription = `${combinedInfo}\\n${enhancedDescription}`.trim();
+    }
+    
+These lines are no longer needed because:
+- start_time and duration are now stored in their own database fields
+- The insert at line 717-718 uses eventData.time and eventData.duration directly
+- The insert at line 720 uses eventData.description directly (not enhancedDescription)

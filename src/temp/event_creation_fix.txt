@@ -1,0 +1,5 @@
+Lines to delete: 703-710
+Lines to update: 744-756
+
+Remove the enhancedDescription logic
+Update the transformation to read from start_time and duration fields directly

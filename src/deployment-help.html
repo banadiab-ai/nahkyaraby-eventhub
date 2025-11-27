@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nahky Araby Event Hub - Fix 404 Errors</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .alert {
+            background: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+        }
+        
+        .alert h3 {
+            color: #F59E0B;
+            margin-bottom: 10px;
+        }
+        
+        .step-container {
+            margin: 30px 0;
+        }
+        
+        .step {
+            background: #F9FAFB;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 2px solid #E5E7EB;
+            transition: all 0.3s;
+        }
+        
+        .step:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+        }
+        
+        .step-number {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 40px;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+        
+        .step h3 {
+            display: inline-block;
+            color: #1F2937;
+            margin-bottom: 15px;
+        }
+        
+        .code-block {
+            background: #1F2937;
+            color: #F9FAFB;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-block code {
+            display: block;
+            white-space: pre;
+        }
+        
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.3s;
+        }
+        
+        .copy-btn:hover {
+            background: #5568d3;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: #E5E7EB;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .success-box {
+            background: #D1FAE5;
+            border-left: 4px solid #10B981;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .success-box h3 {
+            color: #10B981;
+            margin-bottom: 10px;
+        }
+        
+        .info-box {
+            background: #EFF6FF;
+            border-left: 4px solid #3B82F6;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .info-box h3 {
+            color: #3B82F6;
+            margin-bottom: 10px;
+        }
+        
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: transform 0.3s;
+            margin: 5px;
+        }
+        
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+        
+        li {
+            margin: 8px 0;
+        }
+        
+        .footer {
+            background: #F9FAFB;
+            padding: 30px;
+            text-align: center;
+            border-top: 1px solid #E5E7EB;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Fix Your 404 Errors</h1>
+            <p>Nahky Araby Event Hub - Deployment Guide</p>
+        </div>
+        
+        <div class="content">
+            <div class="alert">
+                <h3>⚠️ Problem Detected</h3>
+                <p>Your Edge Function code exists but <strong>hasn't been deployed</strong> to Supabase yet. This is why you're getting 404 errors on all API calls.</p>
+            </div>
+            
+            <div class="step-container">
+                <div class="step">
+                    <div>
+                        <span class="step-number">1</span>
+                        <h3>Choose Your Operating System</h3>
+                    </div>
+                    <div class="tabs">
+                        <button class="tab active" onclick="showTab('linux')">Linux / Mac</button>
+                        <button class="tab" onclick="showTab('windows')">Windows</button>
+                        <button class="tab" onclick="showTab('manual')">Manual</button>
+                    </div>
+                    
+                    <div id="linux" class="tab-content active">
+                        <p>Run these commands in your terminal:</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode('linux-code')">Copy</button>
+                            <code id="linux-code">chmod +x deploy.sh
+./deploy.sh</code>
+                        </div>
+                    </div>
+                    
+                    <div id="windows" class="tab-content">
+                        <p>Run this command in Command Prompt:</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode('windows-code')">Copy</button>
+                            <code id="windows-code">deploy.bat</code>
+                        </div>
+                    </div>
+                    
+                    <div id="manual" class="tab-content">
+                        <p>Run these commands one by one:</p>
+                        <div class="code-block">
+                            <button class="copy-btn" onclick="copyCode('manual-code')">Copy</button>
+                            <code id="manual-code">supabase login
+supabase link --project-ref ojeewoebsidiiufvfwco
+supabase functions deploy server</code>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div>
+                        <span class="step-number">2</span>
+                        <h3>Test Your Deployment</h3>
+                    </div>
+                    <p>After deploying, test that it works:</p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode('test-code')">Copy</button>
+                        <code id="test-code">curl https://ojeewoebsidiiufvfwco.supabase.co/functions/v1/server/health</code>
+                    </div>
+                    <p style="margin-top: 15px;">Should return: <code>{"status":"ok"}</code></p>
+                    
+                    <p style="margin-top: 20px;"><strong>Or use the test script:</strong></p>
+                    <div class="code-block">
+                        <button class="copy-btn" onclick="copyCode('test-script')">Copy</button>
+                        <code id="test-script">chmod +x test-deployment.sh
+./test-deployment.sh</code>
+                    </div>
+                </div>
+                
+                <div class="step">
+                    <div>
+                        <span class="step-number">3</span>
+                        <h3>Verify in Your App</h3>
+                    </div>
+                    <p>Go to your app and check:</p>
+                    <ul>
+                        <li>✅ Login page loads without errors</li>
+                        <li>✅ Can log in with credentials</li>
+                        <li>✅ Events page shows data</li>
+                        <li>✅ Connection Diagnostic (Admin Settings) passes all tests</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="success-box">
+                <h3>✅ That's It!</h3>
+                <p>Once deployed, all your 404 errors will be fixed. The process takes about 2 minutes.</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>📚 About /migrate-admin</h3>
+                <p><strong>What is it?</strong> A legacy tool that migrates admin accounts from old email format (<code>admin@company.com</code>) to new format (<code>admin@company.local</code>).</p>
+                <p style="margin-top: 10px;"><strong>Do you need it?</strong> <strong>No</strong> - You're on a fresh Supabase project with no old accounts to migrate. You can safely ignore this endpoint.</p>
+            </div>
+            
+            <h3 style="margin-top: 40px;">📖 More Documentation</h3>
+            <div style="margin-top: 20px;">
+                <a href="#" class="button" onclick="alert('Open QUICK_START.md in your editor')">Quick Start Guide</a>
+                <a href="#" class="button" onclick="alert('Open DEPLOYMENT_GUIDE.md in your editor')">Full Deployment Guide</a>
+                <a href="#" class="button" onclick="alert('Open TROUBLESHOOTING.md in your editor')">Troubleshooting</a>
+                <a href="#" class="button" onclick="alert('Open ARCHITECTURE.md in your editor')">Architecture Docs</a>
+            </div>
+            
+            <div class="info-box" style="margin-top: 30px;">
+                <h3>🆘 Still Having Issues?</h3>
+                <p>If deployment fails or you still get errors:</p>
+                <ul>
+                    <li>Check Edge Function logs: <code>supabase functions logs server</code></li>
+                    <li>View detailed troubleshooting in <strong>TROUBLESHOOTING.md</strong></li>
+                    <li>Verify your Supabase project is active at the dashboard</li>
+                    <li>Make sure you have internet connection</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>Project ID:</strong> ojeewoebsidiiufvfwco</p>
+            <p><strong>Function Name:</strong> server</p>
+            <p><strong>Function URL:</strong> https://ojeewoebsidiiufvfwco.supabase.co/functions/v1/server</p>
+            <p style="margin-top: 20px; opacity: 0.7;">Nahky Araby Event Hub © 2024</p>
+        </div>
+    </div>
+    
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+        
+        function copyCode(elementId) {
+            const codeElement = document.getElementById(elementId);
+            const text = codeElement.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                btn.style.background = '#10B981';
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '#667eea';
+                }, 2000);
+            }).catch(err => {
+                alert('Failed to copy: ' + err);
+            });
+        }
+    </script>
+</body>
+</html>
