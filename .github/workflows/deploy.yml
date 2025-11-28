@@ -3,6 +3,12 @@ name: Deploy Vite site to GitHub Pages
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - "src/**"
+      - "public/**"
+      - "index.html"
+      - "package.json"
+      - "vite.config.*"
   workflow_dispatch:
 
 permissions:
