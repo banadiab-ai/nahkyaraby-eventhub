@@ -4,7 +4,7 @@ import { logger } from "npm:hono/logger";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import * as kv from "./kv_store.tsx";
 
-// Nahky Araby Event Hub - Staff Management Backend v1.0.2
+// Nahky Araby Event Hub - Staff Management Backend v1.0.3
 // This server handles all backend operations for the event management system
 // Updated: Added public forgot password endpoint that sends emails from admin email
 // Email configuration updated to info@nahkyaraby.com - Production mode
