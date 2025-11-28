@@ -1,0 +1,15 @@
+# Ignore environment files
+*.env
+
+# Ignore local Supabase secrets
+supabase/functions/server/.env
+
+# Ignore node_modules
+node_modules/
+
+# Ignore Vite build output
+dist/
+build/
+
+# Ignore log files
+*.log
