@@ -148,10 +148,6 @@ export function LoginScreen({ onLogin, onPasswordSetup }: LoginScreenProps) {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
-
-          <p className="text-center text-gray-500">
-            New staff members receive login credentials via email
-          </p>
         </CardContent>
       </Card>
       
