@@ -5,25 +5,25 @@ on:
     branches: [ main ]
     paths:
       - "supabase/functions/server/**"
+  workflow_dispatch:
 
 jobs:
   deploy-edge-function:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Supabase CLI
-        run: |
-          curl -sL https://supabase.com/cli/install | sh
-          echo "$HOME/.supabase/bin" >> $GITHUB_PATH
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1     # ← this replaces the curl | sh
+        with:
+          version: latest
 
       - name: Deploy Edge Function "server"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
         run: |
           supabase functions deploy server \
-            --project-ref "$SUPABASE_PROJECT_ID" \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_ID }} \
             --no-verify-jwt
